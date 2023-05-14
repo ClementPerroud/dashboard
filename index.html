@@ -1,11 +1,174 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <title>Hello World</title>
+    <script src="echarts.js"></script>
+    <script src="jquery.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style type="text/css">
+body{
+    font-family: 'Poppins', sans-serif;
+}
+body div{
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+table th, table td{
+    padding: 5px 5px 5px 25px
+}
+
+
+</style>
 </head>
 
 <body>
-    Hello World
+
+    <div>
+        <h1>Dashboard</h1>
+        <div id="portfolio_valuation" style="width: 800px;height:400px;"></div>
+        <div id="portfolio_position" style="width: 800px;height:400px;"></div>
+    </div>
+    <div>
+        <table id="user_table">
+            <tr>
+                <th>Utilisateurs</th>
+                <th>Valeur du portefeuille</th>
+                <th>Couleur</th>
+            </tr>
+        </table>
+    </div>
+    <script>
+        var plotChart = (users_data)=>{
+            users_data = users_data['body']
+            var portfolioValuationChart = echarts.init(document.getElementById('portfolio_valuation'));
+            var portfolioPositionChart = echarts.init(document.getElementById('portfolio_position'));
+            var valuationSeries = [];
+            var positionSeries = [];
+
+            // Iterate thought users
+            for( const [user_id, user_data] of Object.entries(users_data)){
+                user_history = user_data["history"];
+                
+                // Fill user table
+                console.log(user_history.at(-1))
+                user_porfolio_valuation = "Not connected"
+                if(user_history.length > 0){
+                    user_porfolio_valuation = Math.round(user_history.at(-1)['portfolio_valuation']*100)/100
+                }
+                new_tr = $('#user_table').append(`
+                <tr>
+                    <td>${user_data["first_name"]}</td>
+                    <td>${user_porfolio_valuation}</td>
+                    <td style='color:${user_data["display_color"]}; font-size:1.5em; font-weight: 1200'>•</td>
+                </tr>
+                `)
+                
+                // Retrieve data for plots
+                var valuationData = [];
+                var realPositionData = [];
+                var positionData = []
+                for(const data_point of user_history){
+                    valuationData.push([
+                        data_point['timestamp']/1000000,
+                        100*data_point['portfolio_valuation']/user_history.at(0)['portfolio_valuation']
+                    ])
+                    realPositionData.push([
+                        data_point['timestamp']/1000000,
+                        data_point['real_position']
+                    ])
+                    positionData.push([
+                        data_point['timestamp']/1000000,
+                        data_point['position']
+                    ])
+                }
+                console.log(user_history["display_color"])
+                valuationSeries.push({
+                    type : 'line',
+                    data : valuationData,
+                    smooth : true,
+                    showSymbol: false,
+                    color :  user_data["display_color"],
+                    endLabel: {
+                        show: true,
+                        formatter: function (params) {
+                        return user_data['first_name'] + ': ' + Math.round(params.value[1]*100)/100 + '$';
+                        }
+                    },
+                })
+                positionSeries.push({
+                    type : 'line',
+                    data : realPositionData,
+                    smooth : true,
+                    showSymbol: false,
+                    color: user_data["display_color"],
+                    lineStyle : {opacity : 0.5},
+                })
+                positionSeries.push({
+                    type : 'line',
+                    data : positionData,
+                    smooth : true,
+                    showSymbol: false,
+                    color: user_data["display_color"]
+                })
+            }
+            
+
+            optionValuation = {
+                animationDuration: 4000,
+                title: {
+                    text: 'Evolution en % de la valeur des portfeuilles'
+                },
+                tooltip: {
+                    trigger: 'axis'
+                },
+                xAxis: {type:'time'},
+                yAxis: {},
+                series: valuationSeries,
+                grid: {
+                    right: 140
+                },
+            };
+            portfolioValuationChart.setOption(optionValuation);
+
+            optionPosition = {
+                animationDuration: 4000,
+                title: {
+                    text: "Position de prise par l'IA"
+                },
+                tooltip: {
+                    trigger: 'axis'
+                },
+                xAxis: {type:'time'},
+                yAxis: {},
+                series: positionSeries,
+                grid: {
+                    right: 140
+                },
+            };
+            portfolioPositionChart.setOption(optionPosition);
+
+            
+        }
+        // define the callAPI function that takes a first name and last name as parameters
+        var callAPI = ()=>{
+            var myHeaders = new Headers();
+            myHeaders.append("Content-Type", "application/json");
+            var requestOptions = {
+                method: 'POST',
+                headers: myHeaders,
+                redirect: 'follow'
+            };
+            // make API call with parameters and use promises to get response
+            fetch("https://f6pyfa5etg.execute-api.eu-north-1.amazonaws.com/dev", requestOptions)
+            .then((response) => response.json())
+            .then(users_data => plotChart(users_data))
+            .catch(error => console.log('error', error));
+        }
+        callAPI()
+        
+    </script>
 </body>
 </html>
