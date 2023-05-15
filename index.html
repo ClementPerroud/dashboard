@@ -202,6 +202,9 @@ select{
                 },
                 dataZoom: [
                     {
+                    type: 'inside'
+                    },
+                    {
                     textStyle: {
                         color: '#8392A5'
                     },
@@ -218,9 +221,6 @@ select{
                     },
                     brushSelect: true
                     },
-                    {
-                    type: 'inside'
-                    }
                 ],
             };
             portfolioValuationChart.setOption(optionValuation);
@@ -237,9 +237,13 @@ select{
                 grid: {
                     right: 140
                 },
+                dataZoom:[{
+                    type : 'inside'
+                }]
             };
             portfolioPositionChart.setOption(optionPosition);
 
+            echarts.connect([portfolioValuationChart, portfolioPositionChart]);
             
         }
         // define the callAPI function that takes a first name and last name as parameters
