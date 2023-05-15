@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Hello World</title>
+    <title>Tableau de bord</title>
     <script src="echarts.js"></script>
     <script src="jquery.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -15,21 +15,42 @@ body div{
     display: flex;
     flex-direction: column;
     align-items: center;
+    max-width: 100%;
+    width: 900px;
+    margin-top: 20px;
 }
 table th, table td{
     padding: 5px 5px 5px 25px
 }
-
-
+select{
+    width : 200px;
+    max-width: 95%;
+    padding : 10px;
+    font-size: 1em;
+}
+#portfolio_valuation{
+    height:400px;
+    width: 100%;
+}
+#portfolio_position{
+    height: 200px;
+    width: 100%;
+    
+}
 </style>
 </head>
 
 <body>
 
     <div>
-        <h1>Dashboard</h1>
-        <div id="portfolio_valuation" style="width: 800px;height:400px;"></div>
-        <div id="portfolio_position" style="width: 800px;height:400px;"></div>
+        <h1>Tableau de bord</h1>
+        <div>
+            <select name="pair" id="pair-select">
+
+            </select>
+        </div>
+        <div id="portfolio_valuation"></div>
+        <div id="portfolio_position"></div>
     </div>
     <div>
         <table id="user_table">
@@ -41,105 +62,174 @@ table th, table td{
         </table>
     </div>
     <script>
-        var plotChart = (users_data)=>{
-            users_data = users_data['body']
+        var plotChart = async (users_data, pair)=>{
+
             var portfolioValuationChart = echarts.init(document.getElementById('portfolio_valuation'));
             var portfolioPositionChart = echarts.init(document.getElementById('portfolio_position'));
             var valuationSeries = [];
             var positionSeries = [];
 
             // Iterate thought users
+            var first_user_timestamp = null
             for( const [user_id, user_data] of Object.entries(users_data)){
-                user_history = user_data["history"];
-                
-                // Fill user table
-                console.log(user_history.at(-1))
-                user_porfolio_valuation = "Not connected"
-                if(user_history.length > 0){
-                    user_porfolio_valuation = Math.round(user_history.at(-1)['portfolio_valuation']*100)/100
+                if(user_data["pair"] == pair){
+                    user_history = user_data["history"];
+                    
+                    // Check for first timestamp
+                    if(first_user_timestamp == null || first_user_timestamp > user_history.at(0)["timestamp"]){
+                        first_user_timestamp = user_history.at(0)["timestamp"]
+                    }
+                    // Fill user table
+                    user_porfolio_valuation = "Not connected"
+                    if(user_history.length > 0){
+                        user_porfolio_valuation = Math.round(user_history.at(-1)['portfolio_valuation']*100)/100
+                    }
+                    new_tr = $('#user_table').append(`
+                    <tr>
+                        <td>${user_data["first_name"]}</td>
+                        <td>${user_porfolio_valuation}</td>
+                        <td style='color:${user_data["display_color"]}; font-size:1.5em; font-weight: 1200'>■</td>
+                    </tr>
+                    `)
+                    
+                    // Retrieve data for plots
+                    var valuationData = [];
+                    var realPositionData = [];
+                    var positionData = []
+                    for(const data_point of user_history){
+                        
+                        valuationData.push([
+                            data_point['timestamp']/1000000,
+                            100*data_point['portfolio_valuation']/user_history.at(0)['portfolio_valuation']
+                        ])
+                        realPositionData.push([
+                            data_point['timestamp']/1000000,
+                            data_point['real_position']
+                        ])
+                        positionData.push([
+                            data_point['timestamp']/1000000,
+                            data_point['position']
+                        ])
+                    }
+                    valuationSeries.push({
+                        type : 'line',
+                        data : valuationData,
+                        smooth : true,
+                        showSymbol: false,
+                        color :  user_data["display_color"],
+                        endLabel: {
+                            show: true,
+                            formatter: function (params) {
+                            return user_data['first_name'] + ': ' + Math.round(params.value[1]*100)/100 + '%';
+                            }
+                        },
+                    })
+                    positionSeries.push({
+                        type : 'line',
+                        data : realPositionData,
+                        smooth : true,
+                        showSymbol: false,
+                        color: user_data["display_color"],
+                        lineStyle : {opacity : 0.5},
+                    })
+                    positionSeries.push({
+                        type : 'line',
+                        data : positionData,
+                        smooth : true,
+                        showSymbol: false,
+                        color: user_data["display_color"]
+                    })
                 }
-                new_tr = $('#user_table').append(`
-                <tr>
-                    <td>${user_data["first_name"]}</td>
-                    <td>${user_porfolio_valuation}</td>
-                    <td style='color:${user_data["display_color"]}; font-size:1.5em; font-weight: 1200'>•</td>
-                </tr>
-                `)
-                
-                // Retrieve data for plots
-                var valuationData = [];
-                var realPositionData = [];
-                var positionData = []
-                for(const data_point of user_history){
-                    valuationData.push([
-                        data_point['timestamp']/1000000,
-                        100*data_point['portfolio_valuation']/user_history.at(0)['portfolio_valuation']
-                    ])
-                    realPositionData.push([
-                        data_point['timestamp']/1000000,
-                        data_point['real_position']
-                    ])
-                    positionData.push([
-                        data_point['timestamp']/1000000,
-                        data_point['position']
-                    ])
-                }
-                console.log(user_history["display_color"])
-                valuationSeries.push({
-                    type : 'line',
-                    data : valuationData,
-                    smooth : true,
-                    showSymbol: false,
-                    color :  user_data["display_color"],
-                    endLabel: {
-                        show: true,
-                        formatter: function (params) {
-                        return user_data['first_name'] + ': ' + Math.round(params.value[1]*100)/100 + '$';
-                        }
-                    },
-                })
-                positionSeries.push({
-                    type : 'line',
-                    data : realPositionData,
-                    smooth : true,
-                    showSymbol: false,
-                    color: user_data["display_color"],
-                    lineStyle : {opacity : 0.5},
-                })
-                positionSeries.push({
-                    type : 'line',
-                    data : positionData,
-                    smooth : true,
-                    showSymbol: false,
-                    color: user_data["display_color"]
-                })
             }
             
+            // Handle Candlestick plot
+
+            console.log(first_user_timestamp)
+
+            
+            pair_response = await fetch("https://api.binance.com/api/v3/klines?" + new URLSearchParams({
+                symbol: current_pair,
+                interval : '1h',
+                limit : 1000,
+                startTime : parseInt(first_user_timestamp/1000000),
+            }))
+            pair_data = await pair_response.json()
+
+
+            first_close = parseFloat(pair_data.at(0).at(4))
+            pair_data = pair_data.map(function(elem) {
+                return [0,4].map(x=>elem[x]).map(function(elem2, index) {
+                    if(index>0){
+                        return 100*parseFloat(elem2)/first_close;
+                    }
+                    return parseFloat(elem2);
+                });
+            });
+
+
+            console.log(pair_data)
+            valuationSeries.push({
+                type: 'line',
+                data : pair_data,
+                color : "blue",
+                smooth : true,
+                showSymbol: false,
+                lineStyle : {
+                    width: 3
+                },
+                endLabel: {
+                    show: true,
+                    formatter: function (params) {
+                    return pair + ': ' + Math.round(params.value[1]*100)/100 + '%';
+                    }
+                },
+                
+            })
+
 
             optionValuation = {
                 animationDuration: 4000,
                 title: {
-                    text: 'Evolution en % de la valeur des portfeuilles'
+                    text: 'Evolution en % de la valeur des portfeuilles',
+                    left: "center"
                 },
-                tooltip: {
-                    trigger: 'axis'
-                },
+
                 xAxis: {type:'time'},
                 yAxis: {},
                 series: valuationSeries,
                 grid: {
                     right: 140
                 },
+                dataZoom: [
+                    {
+                    textStyle: {
+                        color: '#8392A5'
+                    },
+                    handleIcon:
+                        'path://M10.7,11.9v-1.3H9.3v1.3c-4.9,0.3-8.8,4.4-8.8,9.4c0,5,3.9,9.1,8.8,9.4v1.3h1.3v-1.3c4.9-0.3,8.8-4.4,8.8-9.4C19.5,16.3,15.6,12.2,10.7,11.9z M13.3,24.4H6.7V23h6.6V24.4z M13.3,19.6H6.7v-1.4h6.6V19.6z',
+                    dataBackground: {
+                        areaStyle: {
+                        color: '#8392A5'
+                        },
+                        lineStyle: {
+                        opacity: 0.8,
+                        color: '#8392A5'
+                        }
+                    },
+                    brushSelect: true
+                    },
+                    {
+                    type: 'inside'
+                    }
+                ],
             };
             portfolioValuationChart.setOption(optionValuation);
 
             optionPosition = {
                 animationDuration: 4000,
                 title: {
-                    text: "Position de prise par l'IA"
-                },
-                tooltip: {
-                    trigger: 'axis'
+                    text: "Position de prise par l'IA",
+                    left: "center"
                 },
                 xAxis: {type:'time'},
                 yAxis: {},
@@ -153,7 +243,23 @@ table th, table td{
             
         }
         // define the callAPI function that takes a first name and last name as parameters
-        var callAPI = ()=>{
+        var handleSelectPair = (users_data, current_pair)=>{
+            
+            var pairs = []
+            for(const [user_id, user_data] of Object.entries(users_data)){
+                if (!pairs.includes(user_data['pair'])){
+                    pairs.push(user_data['pair'])
+                }
+            }
+            for(const pair of pairs){
+                $("#pair-select").append(`<option value=${pair}>${pair}</option>`)
+            }
+            $(`#pair-select option[value=${current_pair}]`).attr('selected', 'selected')
+            $("#pair-select").on("change", (e) => {
+                window.location.replace(`?pair=${$('#pair-select option:selected').val()}`);
+            });
+        }
+         var callAPI = async ()=>{
             var myHeaders = new Headers();
             myHeaders.append("Content-Type", "application/json");
             var requestOptions = {
@@ -162,10 +268,20 @@ table th, table td{
                 redirect: 'follow'
             };
             // make API call with parameters and use promises to get response
-            fetch("https://f6pyfa5etg.execute-api.eu-north-1.amazonaws.com/dev", requestOptions)
-            .then((response) => response.json())
-            .then(users_data => plotChart(users_data))
-            .catch(error => console.log('error', error));
+
+            users_response = await fetch("https://f6pyfa5etg.execute-api.eu-north-1.amazonaws.com/dev", requestOptions)
+            users_response = await users_response.json()
+            users_data = users_response["body"]
+            
+            let searchParams = new URLSearchParams(window.location.search)
+            current_pair = "BTCUSDT"
+            if(searchParams.has('pair')){
+                current_pair = searchParams.get('pair')
+            }
+
+            handleSelectPair(users_data, current_pair)
+            plotChart(users_data, current_pair)
+
         }
         callAPI()
         
